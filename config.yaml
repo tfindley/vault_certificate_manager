@@ -1,0 +1,47 @@
+# Global Configuration
+config:
+  vault: "https://vault.example.com:8200"  # Vault Server URL
+  pki: "pki_name"  # Default PKI engine
+  role: "backend"  # Default Vault role for issuing certificates
+  renew: "14d"  # Default renewal threshold before expiration (e.g., 14 days before expiry)
+  cert_store: "/etc/certificates"  # Path to store certificates (defaults to 'certs' if not set)
+  log_file: "/var/log/cert_manager.log"  # Path to log file (if unset, logging is disabled)
+  report_file: "/var/lib/cert_manager/report.json"  # Path for JSON report (if unset, reporting is disabled)
+  token_file: "/etc/vault-token"  # Path to Vault token file (if unset, reads from VAULT_TOKEN env variable)
+
+# List of Certificates to Manage
+certs:
+  - name: "test.example.com"  # Certificate Common Name (CN)
+    renew: "7d"  # Override global renewal threshold (e.g., renew 7 days before expiry)
+    ttl: "90d"  # Certificate lifetime (max determined by Vault role settings)
+    pki: "pki_another"  # Optional: Override global PKI
+    role: "web"  # Optional: Override global role
+    dns_sans:  # Optional: Additional DNS Subject Alternative Names (SANs)
+      - "www.test.example.com"
+      - "localhost"
+    ip_sans:  # Optional: Additional IP SANs
+      - "192.168.1.100"
+      - "127.0.0.1"
+
+    # Certificate Deployment - Optional
+    deploy:
+      - source: cert
+        dest: "/etc/ssl/certs/test.crt"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+      - source: privkey
+        dest: "/etc/ssl/private/test.key"
+        owner: "root"
+        group: "ssl-cert"
+        mode: "0600"
+
+    # Services to restart when certificate is updated - Optional
+    service:
+      - name: "nginx.service"
+        control: "reload"
+        order: 1
+      - name: "apache2.service"
+        control: "restart"
+        order: 2
+
