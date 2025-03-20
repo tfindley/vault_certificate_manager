@@ -4,9 +4,8 @@ config:
   pki: "pki_name"  # Default PKI engine
   role: "backend"  # Default Vault role for issuing certificates
   renew: "14d"  # Default renewal threshold before expiration (e.g., 14 days before expiry)
-  cert_store: "/etc/certificates"  # Path to store certificates (defaults to 'certs' if not set)
+  cert_store: "certs"  # Path to store certificates
   log_file: "/var/log/cert_manager.log"  # Path to log file (if unset, logging is disabled)
-  report_file: "/var/lib/cert_manager/report.json"  # Path for JSON report (if unset, reporting is disabled)
   token_file: "/etc/vault-token"  # Path to Vault token file (if unset, reads from VAULT_TOKEN env variable)
 
 # List of Certificates to Manage
@@ -25,7 +24,7 @@ certs:
 
     # Certificate Deployment - Optional
     deploy:
-      - source: cert
+      - source: cert  # specify cert, chain, fullchain or privkey
         dest: "/etc/ssl/certs/test.crt"
         owner: "root"
         group: "root"

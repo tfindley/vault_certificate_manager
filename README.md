@@ -8,7 +8,6 @@ This Python script manages certificates issued by HashiCorp Vault. It validates,
 - Stores certificates in a configurable directory.
 - Deploys certificates to defined destinations with proper permissions.
 - Restarts/reloads services when certificates are updated.
-- Generates a JSON report for tracking certificate statuses.
 
 ## Prerequisites
 
@@ -70,10 +69,6 @@ sudo chown root:root /etc/vault-token
 ## Logging
 
 If `log_file` is set in `config.yaml`, logs are written there.
-
-## Reporting
-
-**JSON Reporting**: If `report_file` is set, a JSON report is generated with certificate statuses. This is desgined to work with ansible local facts, so you can use Ansible to quickly and easily retrieve the certificates that are managed by the app
 
 ## License
 

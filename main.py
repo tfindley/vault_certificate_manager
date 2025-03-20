@@ -3,7 +3,6 @@ import yaml
 import logging
 import requests
 import subprocess
-import json
 from datetime import datetime, timedelta, timezone
 from OpenSSL import crypto
 
@@ -18,16 +17,21 @@ def load_config():
 
 config = load_config()
 
-# Paths from config with defaults
-CERT_STORE = config["config"].get("cert_store", os.path.join(SCRIPT_DIR, "certs"))
+# CERT_STORE = os.path.join(SCRIPT_DIR, "certs")
+CERT_STORE = config["config"].get("cert_store")
 LOG_FILE = config["config"].get("log_file")
-REPORT_FILE = config["config"].get("report_file")
-TOKEN_FILE = config["config"].get("token_file", "/etc/vault-token")
+TOKEN_FILE = config["config"].get("token_file")
 LOCAL_CA_CERT = os.path.join(SCRIPT_DIR, "vault_ca.pem")
-SYSTEM_CA_CERT = "/etc/ssl/certs/ca-certificates.crt"
-VAULT_CA_CERT = LOCAL_CA_CERT if os.path.exists(LOCAL_CA_CERT) else SYSTEM_CA_CERT
 
-# Configure logging if log_file is defined
+# Handle SSL verification logic
+if "vault_ssl_verify" in config["config"] and config["config"]["vault_ssl_verify"]:
+    VAULT_SSL_VERIFY = config["config"]["vault_ssl_verify"]
+elif os.path.exists(LOCAL_CA_CERT):
+    VAULT_SSL_VERIFY = LOCAL_CA_CERT
+else:
+    VAULT_SSL_VERIFY = True
+
+# Configure logging
 if LOG_FILE:
     logging.basicConfig(
         level=logging.INFO,
@@ -46,7 +50,6 @@ def get_vault_token():
             token = f.read().strip()
     return token
 
-
 def get_cert_expiry(cert_path):
     """Gets the expiration date of a certificate if it exists."""
     if not os.path.exists(cert_path):
@@ -55,23 +58,6 @@ def get_cert_expiry(cert_path):
         cert_data = f.read()
     cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_data)
     return datetime.strptime(cert.get_notAfter().decode(), "%Y%m%d%H%M%SZ").replace(tzinfo=timezone.utc)
-
-
-def restart_services(services):
-    """Restarts or reloads services in specified order."""
-    services.sort(key=lambda x: x.get("order", 0))
-    for service in services:
-        command = f"systemctl {service['control']} {service['name']}"
-        subprocess.run(command, shell=True, check=False)
-        if LOG_FILE:
-            logging.info(f"Executed: {command}")
-
-
-def generate_report(report_data):
-    """Generates a JSON report with certificate status if REPORT_FILE is defined."""
-    if REPORT_FILE:
-        with open(REPORT_FILE, "w") as f:
-            json.dump(report_data, f, indent=4)
 
 
 def request_certificate(vault_token, vault_addr, pki, role, cn, ttl, dns_sans=None, ip_sans=None):
@@ -84,15 +70,13 @@ def request_certificate(vault_token, vault_addr, pki, role, cn, ttl, dns_sans=No
     if ip_sans:
         data["ip_sans"] = ",".join(ip_sans)
     try:
-        response = requests.post(url, headers=headers, json=data, verify=VAULT_CA_CERT)
+        response = requests.post(url, headers=headers, json=data, verify=VAULT_SSL_VERIFY)
         response.raise_for_status()
-        if LOG_FILE:
-            logging.info(f"Certificate requested for {cn}.")
-        return response.json()
+        logging.info(f"Certificate requested for {cn}.")
     except requests.exceptions.RequestException as e:
-        if LOG_FILE:
-            logging.error(f"Request error: {e}")
+        logging.error(f"Request error: {e}")
         return None
+    return response.json()
 
 
 def save_certificate(cert_data, cn):
@@ -105,7 +89,7 @@ def save_certificate(cert_data, cn):
         "fullchain": os.path.join(cert_dir, "fullchain.pem"),
         "privkey": os.path.join(cert_dir, "privkey.pem"),
     }
-    
+
     # Write certificate data to files
     with open(paths["cert"], "w") as f:
         f.write(cert_data["data"]["certificate"])
@@ -115,9 +99,35 @@ def save_certificate(cert_data, cn):
         f.write(cert_data["data"]["certificate"] + "\n" + "\n".join(cert_data["data"]["ca_chain"]))
     with open(paths["privkey"], "w") as f:
         f.write(cert_data["data"]["private_key"])
-    if LOG_FILE:
-        logging.info(f"Certificate saved for {cn}.")
+    logging.info(f"Certificate saved for {cn}.")
     return paths
+
+
+def deploy_certificate(cert_files, deploy_config):
+    """Deploys certificate files only if they have changed."""
+    if not cert_files:
+        return
+    for item in deploy_config:
+        source = item["source"]
+        dest_path = item["dest"]
+        if source in cert_files and os.path.exists(cert_files[source]):
+            if os.path.exists(dest_path):
+                with open(cert_files[source], "r") as src, open(dest_path, "r") as dst:
+                    if src.read() == dst.read():
+                        continue
+            os.system(f"cp {cert_files[source]} {dest_path}")
+            os.system(f"chown {item['owner']}:{item['group']} {dest_path}")
+            os.system(f"chmod {item['mode']} {dest_path}")
+            logging.info(f"Deployed {source} to {dest_path}")
+
+
+def restart_services(services):
+    """Restarts or reloads services in specified order if a certificate was updated."""
+    services.sort(key=lambda x: x.get("order", 0))
+    for service in services:
+        command = f"systemctl {service['control']} {service['name']}"
+        subprocess.run(command, shell=True, check=False)
+        logging.info(f"Executed: {command}")
 
 
 def manage_certificates():
@@ -127,18 +137,14 @@ def manage_certificates():
     default_role = config["config"]["role"]
     global_renew_days = int(config["config"].get("renew", "14d").strip("d"))
     vault_token = get_vault_token()
+    # vault_token = os.getenv("VAULT_TOKEN")
     if not vault_token:
-        if LOG_FILE:
-            logging.error("VAULT_TOKEN is not set or available.")
+        logging.error("VAULT_TOKEN environment variable is not set.")
         return
-    
-    report_data = []
 
     for cert in config["certs"]:
         cn = cert["name"]
         cert_path = os.path.join(CERT_STORE, cn, "cert.pem")
-        cert_files = None
-        cert_data = None
         expiry = get_cert_expiry(cert_path)
         renew_days = int(cert.get("renew", f"{global_renew_days}d").strip("d"))
         ttl = cert.get("ttl", "90d")
@@ -146,25 +152,34 @@ def manage_certificates():
         role = cert.get("role", default_role)
         dns_sans = cert.get("dns_sans", [])
         ip_sans = cert.get("ip_sans", [])
-        
+
+        cert_files = None
+        renewed = False
         if not expiry or expiry - timedelta(days=renew_days) <= datetime.now(timezone.utc):
             cert_data = request_certificate(vault_token, vault_addr, pki, role, cn, ttl, dns_sans, ip_sans)
             if cert_data:
                 cert_files = save_certificate(cert_data, cn)
-                expiry = get_cert_expiry(cert_path)
-                if "service" in cert:
-                    restart_services(cert["service"])
-        
-        destinations = [d["dest"] for d in cert.get("deploy", [])]
-        report_data.append({
-            "certificate": cn,
-            "expiry_date": expiry.isoformat() if expiry else "Unknown",
-            "services": [s["name"] for s in cert.get("service", [])],
-            "destinations": destinations
-        })
+                renewed = True
+        else:
+            # Certificates weren't renewed, but check if files exist for deployment
+            existing_cert_dir = os.path.join(CERT_STORE, cn)
+            potential_paths = {
+                "cert": os.path.join(existing_cert_dir, "cert.pem"),
+                "chain": os.path.join(existing_cert_dir, "chain.pem"),
+                "fullchain": os.path.join(existing_cert_dir, "fullchain.pem"),
+                "privkey": os.path.join(existing_cert_dir, "privkey.pem"),
+            }
+            # Only set cert_files if all paths exist
+            if all(os.path.exists(path) for path in potential_paths.values()):
+                cert_files = potential_paths
 
-    generate_report(report_data)
+        # Deploy certificates if deploy configuration is specified and cert_files exist
+        if "deploy" in cert and cert_files:
+            deploy_certificate(cert_files, cert["deploy"])
+
+        # Restart services only if certificates were renewed
+        if renewed and "service" in cert:
+            restart_services(cert["service"])
 
 if __name__ == "__main__":
     manage_certificates()
-
