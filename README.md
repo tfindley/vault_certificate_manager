@@ -52,8 +52,16 @@ crontab -e
 Example cron job (runs every 6 hours):
 
 ```sh
-0 */6 * * * /usr/bin/python3 /path/to/main.py
+0 */6 * * * /opt/vcm/main.py >/dev/null 2>&1
 ```
+
+Example crontab (runs once a day at 04:05)
+
+```sh
+5 4 * * * /opt/vcm/main.py >/dev/null 2>&1
+```
+
+You can construct your own crontab easily using the [Crontab Generator](https://crontab-generator.org/)
 
 ## Security Considerations
 
