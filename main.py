@@ -58,7 +58,7 @@ def get_vault_token():
     # Fall back to AppRole
     role_id = os.getenv("VAULT_ROLE_ID") or config["config"].get("vault_role_id")
     secret_id = os.getenv("VAULT_SECRET_ID") or config["config"].get("vault_secret_id")
-    vault_addr = config["config"]["vault"]
+    vault_addr = os.getenv("VAULT_ADDR") or config["config"]["vault"]
 
     if role_id and secret_id:
         logging.info("Attempting AppRole login using role_id/secret_id.")
