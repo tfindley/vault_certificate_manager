@@ -1,9 +1,9 @@
 # Global Configuration
 config:
-  vault: "https://vault.example.com:8200"   # Vault Server URL
+  vault: "https://localhost:8200"   # Vault Server URL
   vault_ssl_verify: "/etc/ssl/cert.pem"     # Provide a path to a cert chain to validate Vault against, or set to 'false' to disable SSL verification. Comment out to use python default cert store
-  pki: "pki_name"                           # Default PKI engine
-  role: "backend"                           # Default Vault role for issuing certificates
+  pki: "pki_int"                            # Default PKI engine
+  role: "example-dot-com"                   # Default Vault role for issuing certificates
   renew: "14d"                              # Default renewal threshold before expiration (e.g., 14 days before expiry)
   cert_store: "/opt/vcm/certs"              # Relative Path to store certificates
   log_file: "/var/log/cert_manager.log"     # Path to log file (if unset, logging is disabled)
