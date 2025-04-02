@@ -8,11 +8,11 @@ resource "vault_mount" "pki" {
 }
 
 resource "vault_pki_secret_backend_root_cert" "root_2023" {
-   backend     = vault_mount.pki.path
-   type        = "internal"
-   common_name = "example.com"
-   ttl         = 315360000
-   issuer_name = "root-2023"
+  backend     = vault_mount.pki.path
+  type        = "internal"
+  common_name = "example.com"
+  ttl         = 315360000
+  issuer_name = "root-2023"
 }
 
 output "vault_pki_secret_backend_root_cert_root_2023" {
