@@ -1,3 +1,5 @@
+#!/opt/vcm/.venv/bin/python3
+
 import os
 import yaml
 import logging
@@ -43,12 +45,37 @@ if LOG_FILE:
     )
 
 def get_vault_token():
-    """Retrieve VAULT_TOKEN from environment or secure file."""
+    """Retrieve Vault token from env, token file, or AppRole login."""
     token = os.getenv("VAULT_TOKEN")
-    if not token and os.path.exists(TOKEN_FILE):
+    if not token and TOKEN_FILE and os.path.exists(TOKEN_FILE):
         with open(TOKEN_FILE, "r") as f:
             token = f.read().strip()
-    return token
+
+    if token:
+        logging.info("Using Vault token from environment or token file.")
+        return token
+
+    # Fall back to AppRole
+    role_id = os.getenv("VAULT_ROLE_ID") or config["config"].get("vault_role_id")
+    secret_id = os.getenv("VAULT_SECRET_ID") or config["config"].get("vault_secret_id")
+    vault_addr = os.getenv("VAULT_ADDR") or config["config"]["vault"]
+
+    if role_id and secret_id:
+        logging.info("Attempting AppRole login using role_id/secret_id.")
+        try:
+            url = f"{vault_addr}/v1/auth/approle/login"
+            data = {"role_id": role_id, "secret_id": secret_id}
+            response = requests.post(url, json=data, verify=VAULT_SSL_VERIFY)
+            response.raise_for_status()
+            token = response.json()["auth"]["client_token"]
+            logging.info("AppRole login successful.")
+            return token
+        except requests.exceptions.RequestException as e:
+            logging.error(f"AppRole login failed: {e}")
+            return None
+
+    logging.error("No Vault token or AppRole credentials found.")
+    return None
 
 def get_cert_expiry(cert_path):
     """Gets the expiration date of a certificate if it exists."""
@@ -139,7 +166,7 @@ def manage_certificates():
     vault_token = get_vault_token()
     # vault_token = os.getenv("VAULT_TOKEN")
     if not vault_token:
-        logging.error("VAULT_TOKEN environment variable is not set.")
+        logging.error("Could not obtain a Vault token from env, file, or AppRole.")
         return
 
     for cert in config["certs"]:

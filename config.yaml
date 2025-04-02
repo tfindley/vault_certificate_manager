@@ -1,30 +1,33 @@
 # Global Configuration
 config:
-  vault: "https://vault.example.com:8200"  # Vault Server URL
-  pki: "pki_name"  # Default PKI engine
-  role: "backend"  # Default Vault role for issuing certificates
-  renew: "14d"  # Default renewal threshold before expiration (e.g., 14 days before expiry)
-  cert_store: "certs"  # Path to store certificates
-  log_file: "/var/log/cert_manager.log"  # Path to log file (if unset, logging is disabled)
-  token_file: "/etc/vault-token"  # Path to Vault token file (if unset, reads from VAULT_TOKEN env variable)
+  vault: "https://localhost:8200"   # Vault Server URL
+  vault_ssl_verify: "/etc/ssl/cert.pem"     # Provide a path to a cert chain to validate Vault against, or set to 'false' to disable SSL verification. Comment out to use python default cert store
+  pki: "pki_int"                            # Default PKI engine
+  role: "example-dot-com"                   # Default Vault role for issuing certificates
+  renew: "14d"                              # Default renewal threshold before expiration (e.g., 14 days before expiry)
+  cert_store: "/opt/vcm/certs"              # Relative Path to store certificates
+  log_file: "/var/log/cert_manager.log"     # Path to log file (if unset, logging is disabled)
+  token_file: "/etc/vault-token"            # Path to Vault token file (if unset, reads from VAULT_TOKEN env variable)
+  vault_role_id: "your-role-id"             # <--- new
+  vault_secret_id: "your-secret-id"         # <--- new
 
 # List of Certificates to Manage
 certs:
-  - name: "test.example.com"  # Certificate Common Name (CN)
-    renew: "7d"  # Override global renewal threshold (e.g., renew 7 days before expiry)
-    ttl: "90d"  # Certificate lifetime (max determined by Vault role settings)
-    pki: "pki_another"  # Optional: Override global PKI
-    role: "web"  # Optional: Override global role
-    dns_sans:  # Optional: Additional DNS Subject Alternative Names (SANs)
+  - name: "test.example.com"                # Certificate Common Name (CN)
+    renew: "7d"                             # Override global renewal threshold (e.g., renew 7 days before expiry)
+    ttl: "90d"                              # Certificate lifetime (max determined by Vault role settings)
+    pki: "pki_another"                      # Optional: Override global PKI
+    role: "web"                             # Optional: Override global role
+    dns_sans:                               # Optional: Additional DNS Subject Alternative Names (SANs)
       - "www.test.example.com"
       - "localhost"
-    ip_sans:  # Optional: Additional IP SANs
+    ip_sans:                                # Optional: Additional IP SANs
       - "192.168.1.100"
       - "127.0.0.1"
 
     # Certificate Deployment - Optional
     deploy:
-      - source: cert  # specify cert, chain, fullchain or privkey
+      - source: cert                        # specify cert, chain, fullchain or privkey
         dest: "/etc/ssl/certs/test.crt"
         owner: "root"
         group: "root"
