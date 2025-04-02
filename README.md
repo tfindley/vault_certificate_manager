@@ -157,6 +157,33 @@ Modify the `config.yaml` file:
 | `control`          | True     | False       | string | `reload`        | Choose from `reload` or `restart` depending on the service. |
 | `order`            | True     | False       | int    | `1`             | |
 
+## Authenticating with Vault
+
+To set the Vault Address, you can use the Environmental Variable, or you can specify this in the config.yaml file
+
+The order of presedence for the Vault Address is:
+
+1. Vault Address Env `VAULT_ADDR`
+2. Vault Address value in config.yaml `vault` 
+
+This script can use a Vault Token, or it can request a token when provided with a Role ID and Secret ID.
+
+The order of presendence for Authentication is:
+
+1. Vault Token Env `VAULT_TOKEN`
+2. Vault Token File `token_file`
+3. Vault Role Env `VAULT_ROLE_ID` / `VAULT_SECRET_ID`
+4. Vault Role values in config.yaml `vault_role_id` + `vault_secret_id`
+
+### Optional Environmental Variables
+
+| ENV               | Overrides                          | Description                                     |
+| ----------------- | ---------------------------------- | ----------------------------------------------- |
+| `VAULT_ADDR`      | `vault` in `config.yaml`           | Vault url: i.e: `https://vault.domain.tld:8200` |
+| `VAULT_TOKEN`     | `token_file` in `config.yaml`      | Vault token                                     |
+| `VAULT_ROLE_ID`   | `vault_role_id` in `config.yaml`   | Vault role ID                                   |
+| `VAULT_SECRET_ID` | `vault_secret_id` in `config.yaml` | Vault secret ID                                 |
+
 ## Running the Script
 
 To manually execute the script:

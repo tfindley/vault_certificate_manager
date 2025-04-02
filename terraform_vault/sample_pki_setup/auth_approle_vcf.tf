@@ -10,7 +10,7 @@ resource "vault_approle_auth_backend_role" "vcm" {
   backend = vault_auth_backend.approle.path
   #   backend        = "approle"
   role_name      = "vcm_metrics"
-  token_policies = ["${var.pki_policy_preamble}_read", "${var.pki_policy_preamble}_create", "${var.pki_policy_preamble}_revoke"]
+  token_policies = ["intca_read", "intca_create", "intca_revoke"]
 
   # Optional hardening
   # secret_id_ttl          = "60m"
@@ -37,18 +37,8 @@ output "secret_id" {
   sensitive = true
 }
 
-# Note: this will still output secret_id as an obscured sensitive value to retirieve this afterwards, run:
+# Note: this will still output secret_id as an obscured sensitive value.
+# to retirieve this afterwards, run:
 #
 # terraform output -json secret_id
 #
-# That’ll give you something like:
-# 
-# {
-#   "sensitive": true,
-#   "type": "string",
-#   "value": "s.xxxxxxx"
-# }
-#
-# You can optionally parse this through jq
-#
-# terraform output -json secret_id | jq -r '.value'
